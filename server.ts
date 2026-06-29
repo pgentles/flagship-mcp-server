@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import express from "express";
 import axios from "axios";
 import { z } from "zod";
 
@@ -360,12 +362,63 @@ server.tool(
 //  Start Server
 // ============================================================
 
-async function main() {
-  console.error("Flagship MCP Server starting...");
-  console.error(`Services configured: ${Object.keys(SERVICES).join(", ")}`);
+// ============================================================
+//  HTTP Mode (for public discovery & Claude Desktop remote)
+// ============================================================
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+function createHttpServer() {
+  const app = express();
+  app.use(express.json());
+
+  app.get("/health", (_req, res) => {
+    res.json({
+      status: "flagship-mcp-server live",
+      transport: "http",
+      services: Object.keys(SERVICES),
+      tools: 21,
+    });
+  });
+
+  app.get("/sse", async (_req, res) => {
+    res.json({
+      message: "Use POST /mcp for JSON-RPC calls",
+      endpoints: { mcp: "/mcp", health: "/health" },
+    });
+  });
+
+  app.post("/mcp", async (req, res) => {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+    res.on("close", () => transport.close());
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  });
+
+  return app;
+}
+
+// ============================================================
+//  Start Server
+// ============================================================
+
+async function main() {
+  const mode = process.env.TRANSPORT || "stdio";
+
+  if (mode === "http") {
+    const port = parseInt(process.env.MCP_PORT || "8765");
+    const app = createHttpServer();
+    app.listen(port, "0.0.0.0", () => {
+      console.error(`Flagship MCP Server (HTTP) on port ${port}`);
+      console.error(`Services: ${Object.keys(SERVICES).join(", ")}`);
+      console.error(`Endpoints: /health, /mcp`);
+    });
+  } else {
+    console.error("Flagship MCP Server starting...");
+    console.error(`Services configured: ${Object.keys(SERVICES).join(", ")}`);
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  }
 }
 
 main().catch((error) => {
