@@ -12628,11 +12628,10 @@ server.tool(
   "law_analyze",
   "Analyze a debt collector or credit bureau complaint for FDCPA/FCRA violations",
   {
-    document: import_zod2.z.string().describe("Consumer complaint or collection letter text"),
-    type: import_zod2.z.string().describe("Document type: 'complaint', 'letter', 'notice', 'call_log'")
+    complaint: import_zod2.z.string().describe("Consumer complaint or collection letter text (min 10 characters)")
   },
   async (args) => {
-    const res = await callService(SERVICES.law.baseUrl, "/api/analyze", "POST", { document: args.document, type: args.type });
+    const res = await callService(SERVICES.law.baseUrl, "/api/analyze", "POST", { complaint: args.complaint });
     return { content: [{ type: "text", text: JSON.stringify(res.data) }] };
   }
 );
@@ -12640,11 +12639,10 @@ server.tool(
   "law_detailed",
   "Full legal analysis with specific statute citations, elements, penalties, and demand letter draft",
   {
-    document: import_zod2.z.string().describe("Full text of the complaint or legal document"),
-    type: import_zod2.z.string().describe("Document type: 'complaint', 'letter', 'notice'")
+    complaint: import_zod2.z.string().describe("Full text of the complaint or legal document (min 10 characters)")
   },
   async (args) => {
-    const res = await callService(SERVICES.law.baseUrl, "/api/detailed", "POST", { document: args.document, type: args.type });
+    const res = await callService(SERVICES.law.baseUrl, "/api/detailed", "POST", { complaint: args.complaint });
     return { content: [{ type: "text", text: JSON.stringify(res.data) }] };
   }
 );
